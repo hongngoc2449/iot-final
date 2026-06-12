@@ -1,0 +1,148 @@
+{
+  "smart_irrigation": {
+    "schemaVersion": 1,
+    "devices": {
+      "esp32-irrigation-01": {
+        "metadata": {
+          "deviceId": "esp32-irrigation-01",
+          "name": "Smart Irrigation 01",
+          "board": "ESP32",
+          "firmwareVersion": "2.2.3",
+          "location": "garden",
+          "runtime": {
+            "board": "ESP32",
+            "firmwareVersion": "2.2.3",
+            "bootedAt": 0
+          }
+        },
+        "config": {
+          "autoPumpEnabled": true,
+          "calibration": {
+            "soil": {
+              "dryRaw": 4095,
+              "wetRaw": 300
+            },
+            "water": {
+              "emptyRaw": 0,
+              "fullRaw": 2500
+            },
+            "rain": {
+              "dryRaw": 4095,
+              "wetRaw": 800
+            }
+          },
+          "thresholds": {
+            "soilPumpOnPercent": 30,
+            "soilPumpOffPercent": 45,
+            "minimumWaterPercent": 20,
+            "rainDetectedPercent": 30,
+            "maximumPumpRuntimeMs": 30000,
+            "pumpCooldownMs": 5000
+          },
+          "uploadIntervals": {
+            "latestMs": 2000,
+            "historyMs": 60000
+          },
+          "testMode": {
+            "forceSoilPercent": false,
+            "soilPercent": 10,
+            "pumpRuntimeLimitEnabled": true
+          }
+        },
+        "control": {
+          "mode": "auto",
+          "manualPumpOn": false,
+          "updatedAt": 0,
+          "updatedBy": "initial"
+        },
+        "state": {
+          "online": false,
+          "lastSeen": 0,
+          "uptimeMs": 0,
+          "wifiRssi": -127,
+          "pumpOn": false,
+          "pumpReason": "NOT_CONNECTED",
+          "autoPumpEnabled": true,
+          "controlMode": "auto",
+          "manualPumpRequested": false
+        },
+        "telemetry": {
+          "latest": {
+            "timestamp": 0,
+            "uptimeMs": 0,
+            "soil": {
+              "raw": 0,
+              "percent": 0
+            },
+            "water": {
+              "raw": 0,
+              "percent": 0
+            },
+            "rain": {
+              "raw": 0,
+              "percent": 0
+            },
+            "temperature": {
+              "ds18b20": {
+                "celsius": 0,
+                "valid": false
+              },
+              "dht11": {
+                "celsius": 0,
+                "valid": false
+              }
+            },
+            "humidity": {
+              "dht11": {
+                "percent": 0,
+                "valid": false
+              }
+            },
+            "pump": {
+              "on": false,
+              "reason": "NOT_CONNECTED"
+            }
+          },
+          "history": {
+            "sample_remove_after_import": {
+              "timestamp": 0,
+              "uptimeMs": 0,
+              "soil": {
+                "raw": 0,
+                "percent": 0
+              },
+              "water": {
+                "raw": 0,
+                "percent": 0
+              },
+              "rain": {
+                "raw": 0,
+                "percent": 0
+              },
+              "temperature": {
+                "ds18b20": {
+                  "celsius": 0,
+                  "valid": false
+                },
+                "dht11": {
+                  "celsius": 0,
+                  "valid": false
+                }
+              },
+              "humidity": {
+                "dht11": {
+                  "percent": 0,
+                  "valid": false
+                }
+              },
+              "pump": {
+                "on": false,
+                "reason": "SCHEMA EXAMPLE"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

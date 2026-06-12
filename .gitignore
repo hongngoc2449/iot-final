@@ -1,0 +1,5 @@
+.pio/
+.vscode/
+
+# Keep real credentials out of source control.
+include/secrets.h
