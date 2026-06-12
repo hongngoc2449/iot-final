@@ -2,9 +2,13 @@ const DATABASE_URL =
   "https://smart-irrigation-esp32-af35c-default-rtdb.asia-southeast1.firebasedatabase.app";
 const DEVICE_ID = "esp32-irrigation-01";
 const DEVICE_PATH = `/smart_irrigation/devices/${DEVICE_ID}`;
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 700;
 const OFFLINE_AFTER_MS = 12000;
 const MAX_POINTS = 30;
+const REQUEST_TIMEOUT_MS = 6500;
+const COMMAND_MAX_RETRIES = 3;
+const COMMAND_RETRY_DELAY_MS = 400;
+const ERROR_TOAST_COOLDOWN_MS = 8000;
 
 const $ = (id) => document.getElementById(id);
 const elements = {
@@ -53,6 +57,10 @@ const trend = { soil: [], water: [], rain: [] };
 let latestDevice = null;
 let requestPending = false;
 let toastTimer;
+let pollTimer;
+let pollInFlight = false;
+let pollSequence = 0;
+let lastErrorToastAt = 0;
 
 function number(value, fallback = 0) {
   return Number.isFinite(Number(value)) ? Number(value) : fallback;
@@ -214,18 +222,20 @@ function renderDevice(device) {
   text("climateLabel", dht.valid ? "HOẠT ĐỘNG" : "LỖI CẢM BIẾN");
 
   const pumpOn = state.pumpOn === true || pump.on === true;
+  // Prefer control.* (command source of truth) to avoid flicker while state.* lags.
+  const activeControlMode = control.mode || state.controlMode || "auto";
   elements.pumpState.textContent = pumpOn ? "Đang hoạt động" : "Đang tắt";
   elements.pumpReason.textContent = translatedReason(state.pumpReason || pump.reason);
   elements.pumpOrb.classList.toggle("active", pumpOn);
-  elements.controlModeLabel.textContent =
-    `Chế độ ${(state.controlMode || control.mode || "auto").toUpperCase()}`;
+  elements.controlModeLabel.textContent = `Chế độ ${activeControlMode.toUpperCase()}`;
   elements.runtimeLimitLabel.textContent =
     testMode.pumpRuntimeLimitEnabled === false
       ? "TEST: không giới hạn thời gian"
       : `Tối đa ${Math.round(number(thresholds.maximumPumpRuntimeMs, 30000) / 1000)} giây/lần`;
 
-  const manual = control.mode === "manual";
-  const manualRequested = control.manualPumpOn === true;
+  const manual = activeControlMode === "manual";
+  const manualRequested =
+    control.manualPumpOn === true || state.manualPumpRequested === true;
   const manualOverrideActive = manual && manualRequested;
   elements.autoButton.classList.toggle("active", !manual);
   elements.manualButton.classList.toggle("active", manual);
@@ -238,7 +248,7 @@ function renderDevice(device) {
   // Show an explicit override badge when manual request is active.
   const overrideLabel = $("override-label");
   if (manualOverrideActive) {
-    const forcedSoil = testMode.soilPercent ?? testMode.soilPercent ?? 10;
+    const forcedSoil = testMode.soilPercent ?? 10;
     overrideLabel.textContent = `FORCE SOIL ${Math.round(number(forcedSoil))}% · RUNTIME OFF`;
     overrideLabel.style.display = "inline-block";
   } else {
@@ -335,24 +345,98 @@ function drawChart() {
 }
 
 async function firebaseRequest(path, options = {}) {
-  const response = await fetch(`${DATABASE_URL}${path}.json`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-  if (!response.ok) {
-    throw new Error(`Firebase HTTP ${response.status}`);
+  const { timeoutMs = REQUEST_TIMEOUT_MS, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const isRead = !fetchOptions.method || fetchOptions.method === "GET";
+  const cacheBuster = isRead ? `?t=${Date.now()}` : "";
+
+  try {
+    const response = await fetch(`${DATABASE_URL}${path}.json${cacheBuster}`, {
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      signal: controller.signal,
+      ...fetchOptions,
+    });
+    if (!response.ok) {
+      throw new Error(`Firebase HTTP ${response.status}`);
+    }
+    return response.json();
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error("Request timeout");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return response.json();
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function cloneDevice(device) {
+  return device ? JSON.parse(JSON.stringify(device)) : null;
+}
+
+function applyOptimisticControlUpdate(values) {
+  if (!latestDevice) {
+    return;
+  }
+
+  const device = cloneDevice(latestDevice);
+  device.control = {
+    ...(device.control || {}),
+    ...values,
+  };
+  device.state = {
+    ...(device.state || {}),
+    controlMode: values.mode ?? device.state?.controlMode,
+    manualPumpRequested:
+      values.manualPumpOn ?? device.state?.manualPumpRequested,
+    updatedAt: Date.now(),
+  };
+
+  if (values.mode === "auto") {
+    device.state.manualPumpRequested = false;
+    device.state.pumpReason = device.state.pumpReason || "AUTO";
+  }
+
+  latestDevice = device;
+  renderDevice(device);
+}
+
+function scheduleNextPoll(delayMs = POLL_INTERVAL_MS) {
+  clearTimeout(pollTimer);
+  pollTimer = setTimeout(pollDevice, delayMs);
 }
 
 async function pollDevice() {
+  if (pollInFlight) {
+    return;
+  }
+
+  pollInFlight = true;
+  const requestId = ++pollSequence;
+
   try {
     const device = await firebaseRequest(DEVICE_PATH);
     if (!device) throw new Error("Không tìm thấy thiết bị trong Firebase");
-    renderDevice(device);
+    if (requestId === pollSequence) {
+      renderDevice(device);
+    }
+    scheduleNextPoll(POLL_INTERVAL_MS);
   } catch (error) {
     setConnection("offline", "Mất kết nối Firebase");
-    showToast(error.message);
+    const now = Date.now();
+    if (now - lastErrorToastAt >= ERROR_TOAST_COOLDOWN_MS) {
+      lastErrorToastAt = now;
+      showToast(error.message);
+    }
+    scheduleNextPoll(Math.min(POLL_INTERVAL_MS * 3, 5000));
+  } finally {
+    pollInFlight = false;
   }
 }
 
@@ -360,19 +444,37 @@ async function updateControl(values, successMessage) {
   if (requestPending) return;
   requestPending = true;
   elements.pumpButton.disabled = true;
+
+  let lastError = null;
+
   try {
-    await firebaseRequest(`${DEVICE_PATH}/control`, {
-      method: "PATCH",
-      body: JSON.stringify({
-        ...values,
-        updatedAt: { ".sv": "timestamp" },
-        updatedBy: "web-dashboard",
-      }),
-    });
-    showToast(successMessage);
-    await pollDevice();
+    for (let attempt = 1; attempt <= COMMAND_MAX_RETRIES; attempt += 1) {
+      try {
+        await firebaseRequest(`${DEVICE_PATH}/control`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            ...values,
+            updatedAt: Date.now(),
+            updatedBy: "web-dashboard",
+          }),
+        });
+
+        applyOptimisticControlUpdate(values);
+        showToast(successMessage);
+        scheduleNextPoll(0);
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+
+      if (attempt < COMMAND_MAX_RETRIES) {
+        await delay(COMMAND_RETRY_DELAY_MS * attempt);
+      }
+    }
+
+    throw lastError || new Error("Không xác định được lỗi gửi lệnh");
   } catch (error) {
-    showToast(`Không thể gửi lệnh: ${error.message}`);
+    showToast(`Không thể gửi lệnh: ${error.message || error}`);
   } finally {
     requestPending = false;
     if (latestDevice) renderDevice(latestDevice);
@@ -409,5 +511,4 @@ elements.pumpButton.addEventListener("click", () => {
 });
 
 window.addEventListener("resize", drawChart);
-pollDevice();
-setInterval(pollDevice, POLL_INTERVAL_MS);
+scheduleNextPoll(0);

@@ -23,7 +23,6 @@ SensorSnapshot sensors;
 bool hasSensorSample = false;
 bool ds18b20ConversionStarted = false;
 bool pumpState = false;
-bool manualRunTimedOut = false;
 const char* pumpReason = "STARTUP OFF";
 
 uint32_t pumpStartedAt = 0;
@@ -56,16 +55,40 @@ bool dhtReadingIsValid(float temperature, float humidity) {
          temperature <= 80.0F && humidity >= 0.0F && humidity <= 100.0F;
 }
 
+void pulseRelay(bool turnOn);
+
 void writeRelay(bool turnOn) {
+  if (turnOn) {
+    // **PULSE MODE for ON**: Toggle relay to wake up stuck relays
+    pulseRelay(true);
+  } else {
+    // **SIMPLE MODE for OFF**: Just set low
+    const bool outputHigh =
+        AppConfig::RELAY_ACTIVE_LOW ? !turnOn : turnOn;
+    const int outValue = outputHigh ? HIGH : LOW;
+    digitalWrite(AppConfig::RELAY_PIN, outValue);
+    const int readBack = digitalRead(AppConfig::RELAY_PIN);
+    Serial.printf("[Relay] pin=%d, requested=%s, output=%d, readBack=%d\n",
+                  AppConfig::RELAY_PIN, "OFF", outValue, readBack);
+  }
+}
+
+// Alternative: pulse the relay pin (for latching relays or stuck state recovery).
+void pulseRelay(bool turnOn) {
   const bool outputHigh =
       AppConfig::RELAY_ACTIVE_LOW ? !turnOn : turnOn;
   const int outValue = outputHigh ? HIGH : LOW;
+  const int offValue = outputHigh ? LOW : HIGH;
+  
   digitalWrite(AppConfig::RELAY_PIN, outValue);
-  // Diagnostic: read back the pin level and print expected vs actual.
-  const int readBack = digitalRead(AppConfig::RELAY_PIN);
-  Serial.printf("[Relay] pin=%d, requested=%s, output=%d, readBack=%d\n",
-                AppConfig::RELAY_PIN, turnOn ? "ON" : "OFF", outValue,
-                readBack);
+  Serial.printf("[Relay] pulse: set pin to %d\n", outValue);
+  delayMicroseconds(500);  // Brief pulse
+  digitalWrite(AppConfig::RELAY_PIN, offValue);
+  Serial.printf("[Relay] pulse: set pin back to %d\n", offValue);
+  delayMicroseconds(100);
+  // Re-assert the desired level
+  digitalWrite(AppConfig::RELAY_PIN, outValue);
+  Serial.printf("[Relay] pulse: re-asserted to %d\n", outValue);
 }
 
 void setPump(bool turnOn, const char* reason) {
@@ -84,6 +107,8 @@ void setPump(bool turnOn, const char* reason) {
 
   pumpState = turnOn;
   writeRelay(turnOn);
+
+  FirebaseSync::publishStateNow(pumpState, pumpReason);
 
   if (turnOn) {
     pumpStartedAt = millis();
@@ -133,27 +158,34 @@ void updatePumpLogic() {
     return;
   }
 
-    const bool manualOverrideActive = FirebaseSync::manualMode() &&
-                    FirebaseSync::manualPumpRequested();
+  const bool manualOverrideActive = FirebaseSync::manualMode() &&
+                                    FirebaseSync::manualPumpRequested();
 
-    const int effectiveSoilPercent =
-      manualOverrideActive ? AppConfig::TEST_SOIL_PERCENT : sensors.soilPercent;
+  // In manual mode with pump request, bypass ALL safety checks and turn on pump.
+  if (FirebaseSync::manualMode()) {
+    if (!FirebaseSync::manualPumpRequested()) {
+      setPump(false, "MANUAL OFF");
+    } else {
+      // Manual request is ON: bypass all safety checks (water, soil, rain, sensors).
+      // Pump runs freely until user turns off the request (no timeout).
+      setPump(true, pumpState ? "MANUAL PUMPING" : "MANUAL ON");
+    }
+    return;
+  }
 
-    const bool soilIsDry = effectiveSoilPercent > 0 &&
-               effectiveSoilPercent < AppConfig::SOIL_PUMP_ON_PERCENT;
-    const bool soilIsWetEnough =
+  // Auto mode logic below (all safety checks apply here).
+  const int effectiveSoilPercent = sensors.soilPercent;
+  const bool soilIsDry = effectiveSoilPercent > 0 &&
+                         effectiveSoilPercent < AppConfig::SOIL_PUMP_ON_PERCENT;
+  const bool soilIsWetEnough =
       effectiveSoilPercent > AppConfig::SOIL_PUMP_OFF_PERCENT;
   const bool waterIsEnough =
       sensors.waterPercent > AppConfig::MIN_WATER_PERCENT;
   const bool rainDetected =
       sensors.rainPercent >= AppConfig::RAIN_DETECTED_PERCENT;
-    // If manual mode with a manual pump request is active, emulate the
-    // requested test-mode overrides at runtime: force soil percent and
-    // disable the pump runtime limit. These are compile-time `constexpr`
-    // values, so we only apply them here during manual operation.
-      const bool pumpTimeout =
-        (AppConfig::ENABLE_PUMP_RUNTIME_LIMIT && !manualOverrideActive) && pumpState &&
-        millis() - pumpStartedAt >= AppConfig::MAX_PUMP_RUNTIME_MS;
+  const bool pumpTimeout =
+      AppConfig::ENABLE_PUMP_RUNTIME_LIMIT && pumpState &&
+      millis() - pumpStartedAt >= AppConfig::MAX_PUMP_RUNTIME_MS;
   const bool cooldownDone =
       millis() - pumpStoppedAt >= AppConfig::PUMP_COOLDOWN_MS;
 
@@ -174,27 +206,10 @@ void updatePumpLogic() {
     return;
   }
   if (pumpTimeout) {
-    setPump(false, FirebaseSync::manualMode() ? "MANUAL TIMEOUT" : "MAX RUNTIME");
-    manualRunTimedOut = FirebaseSync::manualMode();
+    setPump(false, "MAX RUNTIME");
     return;
   }
 
-  if (FirebaseSync::manualMode()) {
-    if (!FirebaseSync::manualPumpRequested()) {
-      manualRunTimedOut = false;
-      setPump(false, "MANUAL OFF");
-    } else if (manualRunTimedOut) {
-      setPump(false, "MANUAL TIMEOUT");
-    } else {
-      // When the user requests manual pump on from the dashboard, ignore the
-      // short cooldown to allow immediate control. Safety checks (water,
-      // rain, sensor validity) still apply above.
-      setPump(true, pumpState ? "MANUAL PUMPING" : "MANUAL ON");
-    }
-    return;
-  }
-
-  manualRunTimedOut = false;
   if (!AppConfig::ENABLE_AUTO_PUMP) {
     setPump(false, "AUTO DISABLED");
     return;
@@ -242,12 +257,8 @@ void printDebug() {
 
   Serial.printf("Pump: %s, reason=%s\n", pumpState ? "ON" : "OFF",
                 pumpReason);
-  const bool manualOverrideActive = FirebaseSync::manualMode() &&
-                                    FirebaseSync::manualPumpRequested();
-  const bool soilForcedActive = AppConfig::FORCE_SOIL_PERCENT_FOR_TEST ||
-                                manualOverrideActive;
-  const bool runtimeLimitActive = AppConfig::ENABLE_PUMP_RUNTIME_LIMIT &&
-                                  !manualOverrideActive;
+  const bool soilForcedActive = AppConfig::FORCE_SOIL_PERCENT_FOR_TEST;
+  const bool runtimeLimitActive = AppConfig::ENABLE_PUMP_RUNTIME_LIMIT;
   Serial.printf("Pump test: soil forced=%s (%d%%), runtime limit=%s\n",
                 soilForcedActive ? "YES" : "NO",
                 soilForcedActive ? AppConfig::TEST_SOIL_PERCENT : sensors.soilPercent,
@@ -442,10 +453,28 @@ void setup() {
 void loop() {
   const uint32_t now = millis();
 
+  // **FAST PATH**: Check manual pump mode every iteration (no 2s delay!)
+  // This allows instant response to dashboard "Bật bơm" button
+  if (hasSensorSample && FirebaseSync::manualMode()) {
+    const bool manualPumpRequested = FirebaseSync::manualPumpRequested();
+    if (manualPumpRequested && !pumpState) {
+      setPump(true, "MANUAL ON");
+    } else if (!manualPumpRequested && pumpState) {
+      setPump(false, "MANUAL OFF");
+    } else if (manualPumpRequested) {
+      // Manual request is ON: pump runs immediately, bypass all safety
+      // Keep the relay level as-is without spamming no-op state changes.
+    }
+  }
+
+  // **SLOW PATH**: Sensor read & auto mode (every 2 seconds)
   if (now - lastSensorRead >= AppConfig::SENSOR_INTERVAL_MS) {
     lastSensorRead = now;
     readAllSensors();
-    updatePumpLogic();
+    // Only run auto mode logic if NOT in manual mode
+    if (!FirebaseSync::manualMode()) {
+      updatePumpLogic();
+    }
     printDebug();
   }
 

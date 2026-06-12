@@ -41,8 +41,12 @@ void processFirebaseResult(AsyncResult& result) {
   }
 
   if (result.isError()) {
+    const int code = result.error().code();
+    if (code == -118) {
+      return;
+    }
     Firebase.printf("[Firebase] %s: %s (%d)\n", result.uid().c_str(),
-                    result.error().message().c_str(), result.error().code());
+                    result.error().message().c_str(), code);
   }
 }
 
@@ -325,6 +329,16 @@ void begin() {
   Serial.println("[WiFi] Connecting...");
 }
 
+void publishStateNow(bool pumpOn, const char* pumpReason) {
+  if (!firebaseInitialized || !firebaseApp.ready() || !configurationValid) {
+    return;
+  }
+
+  const String state = buildStatePayload(pumpOn, pumpReason);
+  database.set<object_t>(firebaseClient, deviceRoot + "/state", object_t(state),
+                         processFirebaseResult, "state-now");
+}
+
 void loop(const SensorSnapshot& sensors, bool pumpOn, const char* pumpReason) {
   maintainWifi();
   startFirebase();
@@ -334,7 +348,18 @@ void loop(const SensorSnapshot& sensors, bool pumpOn, const char* pumpReason) {
   }
 
   firebaseApp.loop();
-  if (!firebaseApp.ready() || sensors.sampledAtMs == 0) {
+  if (!firebaseApp.ready()) {
+    return;
+  }
+
+  const uint32_t now = millis();
+  if (lastControlRead == 0 ||
+      now - lastControlRead >= AppConfig::FIREBASE_CONTROL_INTERVAL_MS) {
+    lastControlRead = now;
+    readControl();
+  }
+
+  if (sensors.sampledAtMs == 0) {
     return;
   }
 
@@ -349,7 +374,6 @@ void loop(const SensorSnapshot& sensors, bool pumpOn, const char* pumpReason) {
     metadataUploaded = true;
   }
 
-  const uint32_t now = millis();
   if (now - lastLatestUpload >= AppConfig::FIREBASE_LATEST_INTERVAL_MS) {
     lastLatestUpload = now;
     uploadLatest(sensors, pumpOn, pumpReason);
@@ -358,11 +382,6 @@ void loop(const SensorSnapshot& sensors, bool pumpOn, const char* pumpReason) {
   if (now - lastHistoryUpload >= AppConfig::FIREBASE_HISTORY_INTERVAL_MS) {
     lastHistoryUpload = now;
     uploadHistory(sensors, pumpOn, pumpReason);
-  }
-
-  if (now - lastControlRead >= AppConfig::FIREBASE_CONTROL_INTERVAL_MS) {
-    lastControlRead = now;
-    readControl();
   }
 }
 

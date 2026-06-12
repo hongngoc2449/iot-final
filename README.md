@@ -11,8 +11,9 @@ khien bom; hien thi OLED; dong bo du lieu len Firebase Realtime Database.
 - `smart_irrigation/devices/esp32-irrigation-01/telemetry/history`: lich su theo
   Firebase push ID.
 
-Firmware ghi `latest` va `state` moi 2 giay, `history` moi 60 giay. Dieu khien bom van
-hoat dong cuc bo khi mat Wi-Fi hoac Firebase.
+Firmware ghi `latest` va `state` moi 2 giay, `history` moi 60 giay, va doc `control`
+moi ~700ms de nhan lenh tu dashboard nhanh hon. Dieu khien bom van hoat dong cuc bo
+khi mat Wi-Fi hoac Firebase.
 
 Bom bat khi do am dat duoi 30%, co du nuoc, khong mua va cam bien DS18B20 hop
 le. Bom tat khi dat tren 45%, thieu nuoc, co mua, loi cam bien hoac da chay du
@@ -59,7 +60,7 @@ server hoac deploy len Firebase Hosting:
 npx firebase-tools deploy --only hosting
 ```
 
-Dashboard doc du lieu moi 2 giay va ghi len node `control`:
+Dashboard doc du lieu moi 1 giay, co retry xac nhan lenh, va ghi len node `control`:
 
 - `mode: "auto"`: ESP32 dieu khien bom theo cam bien.
 - `mode: "manual"` va `manualPumpOn: true`: yeu cau bat bom thu cong.
