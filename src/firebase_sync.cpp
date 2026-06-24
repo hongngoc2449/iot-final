@@ -7,6 +7,7 @@
 #include <WiFiClientSecure.h>
 
 #include <cstring>
+#include <time.h>
 
 #include "app_config.h"
 #include "secrets.h"
@@ -29,6 +30,19 @@ uint32_t lastControlRead = 0;
 String deviceRoot;
 bool controlManualMode = false;
 bool controlManualPumpOn = false;
+
+constexpr long UTC_OFFSET_SECONDS = 7 * 60 * 60;
+
+String readableTime() {
+  struct tm timeInfo;
+  if (!getLocalTime(&timeInfo, 20)) {
+    return "TIME_NOT_SYNCED";
+  }
+
+  char value[20];
+  strftime(value, sizeof(value), "%Y-%m-%d %H:%M:%S", &timeInfo);
+  return String(value);
+}
 
 bool containsPlaceholder(const char* value) {
   return value == nullptr || value[0] == '\0' ||
@@ -87,7 +101,9 @@ String buildTelemetryPayload(const SensorSnapshot& sensors, bool pumpOn,
   String json;
   json.reserve(700);
 
-  json += "{\"timestamp\":{\".sv\":\"timestamp\"},\"uptimeMs\":";
+  json += "{\"timestamp\":{\".sv\":\"timestamp\"},\"timestampText\":\"";
+  json += readableTime();
+  json += "\",\"uptimeMs\":";
   json += sensors.sampledAtMs;
 
   json += ",\"soil\":{\"raw\":";
@@ -130,6 +146,9 @@ String buildStatePayload(bool pumpOn, const char* pumpReason) {
   String json;
   json.reserve(240);
   json += "{\"online\":true,\"lastSeen\":{\".sv\":\"timestamp\"},";
+  json += "\"lastSeenText\":\"";
+  json += readableTime();
+  json += "\",";
   json += "\"uptimeMs\":";
   json += millis();
   json += ",\"wifiRssi\":";
@@ -153,7 +172,10 @@ String buildRuntimeMetadataPayload() {
   json.reserve(180);
   json += "{\"firmwareVersion\":\"";
   json += AppConfig::FIRMWARE_VERSION;
-  json += "\",\"board\":\"ESP32\",\"bootedAt\":{\".sv\":\"timestamp\"}}";
+  json += "\",\"board\":\"ESP32\",\"bootedAt\":{\".sv\":\"timestamp\"},";
+  json += "\"bootedAtText\":\"";
+  json += readableTime();
+  json += "\"}";
   return json;
 }
 
@@ -212,6 +234,7 @@ void startFirebase() {
 
   sslClient.setInsecure();
   sslClient.setHandshakeTimeout(5);
+  configTime(UTC_OFFSET_SECONDS, 0, "pool.ntp.org", "time.nist.gov");
 
   initializeApp(firebaseClient, firebaseApp, getAuth(noAuth),
                 processFirebaseResult, "no-auth");

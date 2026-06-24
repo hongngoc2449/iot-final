@@ -58,6 +58,7 @@
         "state": {
           "online": false,
           "lastSeen": 0,
+          "lastSeenText": "YYYY-MM-DD HH:mm:ss",
           "uptimeMs": 0,
           "wifiRssi": -127,
           "pumpOn": false,
@@ -69,6 +70,7 @@
         "telemetry": {
           "latest": {
             "timestamp": 0,
+            "timestampText": "YYYY-MM-DD HH:mm:ss",
             "uptimeMs": 0,
             "soil": {
               "raw": 0,
@@ -106,6 +108,7 @@
           "history": {
             "sample_remove_after_import": {
               "timestamp": 0,
+              "timestampText": "YYYY-MM-DD HH:mm:ss",
               "uptimeMs": 0,
               "soil": {
                 "raw": 0,
