@@ -1,0 +1,76 @@
+%%{init: {"theme":"base","themeCSS":"svg { background-color: #ffffff !important; }","themeVariables":{"darkMode":false,"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#ffffff","mainBkg":"#ffffff","secondBkg":"#ffffff","tertiaryColor":"#ffffff","primaryTextColor":"#111827","textColor":"#111827","lineColor":"#334155","edgeLabelBackground":"#ffffff","clusterBkg":"#f8fafc","clusterBorder":"#cbd5e1"},"flowchart":{"curve":"linear","diagramPadding":24}}}%%
+flowchart LR
+    subgraph ESP["ESP32 Dev Board"]
+        P34["GPIO34<br/>ADC input"]
+        P35["GPIO35<br/>ADC input"]
+        P32["GPIO32<br/>ADC input"]
+        P19["GPIO19<br/>1-Wire data"]
+        P4["GPIO4<br/>DHT data"]
+        P26["GPIO26<br/>Relay control"]
+        P21["GPIO21<br/>I2C SDA"]
+        P22["GPIO22<br/>I2C clock"]
+        V3["3V3 / 5V"]
+        GND["Ground"]
+    end
+
+    subgraph SENS["Sensor Modules"]
+        SOIL["Soil Moisture Sensor<br/>AO -> GPIO34<br/>VCC -> 3V3/5V<br/>GND -> GND"]
+        WATER["Water Level Sensor<br/>AO -> GPIO35<br/>VCC -> 3V3/5V<br/>GND -> GND"]
+        RAIN["Rain Sensor<br/>AO -> GPIO32<br/>VCC -> 3V3/5V<br/>GND -> GND"]
+        DS["DS18B20<br/>DQ -> GPIO19<br/>VCC -> 3V3<br/>GND -> GND<br/>4.7k pull-up: DQ to VCC"]
+        DHT["DHT11<br/>DATA -> GPIO4<br/>VCC -> 3V3/5V<br/>GND -> GND"]
+    end
+
+    subgraph DISP["Local Display"]
+        OLED["OLED SH1106 I2C<br/>SDA -> GPIO21<br/>SCL -> GPIO22<br/>VCC -> 3V3/5V<br/>GND -> GND"]
+    end
+
+    subgraph ACT["Pump Actuation"]
+        RELAY["Relay Module<br/>IN -> GPIO26<br/>VCC -> 5V<br/>GND -> common GND"]
+        PUMP["DC Water Pump"]
+        EXT["External Pump Power Supply<br/>Positive -> Relay COM<br/>Negative -> Pump -"]
+    end
+
+    P34 --> SOIL
+    P35 --> WATER
+    P32 --> RAIN
+    P19 --> DS
+    P4 --> DHT
+    P21 --> OLED
+    P22 --> OLED
+    P26 --> RELAY
+
+    V3 -. power .-> SOIL
+    V3 -. power .-> WATER
+    V3 -. power .-> RAIN
+    V3 -. power .-> DS
+    V3 -. power .-> DHT
+    V3 -. power .-> OLED
+    GND -. common ground .-> SOIL
+    GND -. common ground .-> WATER
+    GND -. common ground .-> RAIN
+    GND -. common ground .-> DS
+    GND -. common ground .-> DHT
+    GND -. common ground .-> OLED
+    GND -. common ground .-> RELAY
+
+    EXT -->|"COM"| RELAY
+    RELAY -->|"Normally Open"| PUMP
+    PUMP -->|"Pump - returns to supply -"| EXT
+
+    classDef esp fill:#e9f8ef,stroke:#15803d,color:#14532d,stroke-width:1.4px
+    classDef sensor fill:#eaf3ff,stroke:#2563eb,color:#1e3a8a,stroke-width:1.4px
+    classDef display fill:#f5f0ff,stroke:#7c3aed,color:#4c1d95,stroke-width:1.4px
+    classDef actuator fill:#fff1f2,stroke:#e11d48,color:#881337,stroke-width:1.4px
+    classDef power fill:#fff7ed,stroke:#ea580c,color:#7c2d12,stroke-width:1.4px
+
+    class P34,P35,P32,P19,P4,P26,P21,P22,V3,GND esp
+    class SOIL,WATER,RAIN,DS,DHT sensor
+    class OLED display
+    class RELAY,PUMP actuator
+    class EXT power
+
+    style ESP fill:#f8fafc,stroke:#cbd5e1,color:#334155
+    style SENS fill:#f8fafc,stroke:#cbd5e1,color:#334155
+    style DISP fill:#f8fafc,stroke:#cbd5e1,color:#334155
+    style ACT fill:#f8fafc,stroke:#cbd5e1,color:#334155

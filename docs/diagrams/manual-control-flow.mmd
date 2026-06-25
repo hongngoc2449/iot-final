@@ -1,0 +1,26 @@
+%%{init: {"theme":"base","themeCSS":"svg { background-color: #ffffff !important; }","themeVariables":{"darkMode":false,"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#ffffff","mainBkg":"#ffffff","secondBkg":"#ffffff","tertiaryColor":"#ffffff","primaryTextColor":"#111827","textColor":"#111827","lineColor":"#334155","edgeLabelBackground":"#ffffff","clusterBkg":"#f8fafc","clusterBorder":"#cbd5e1"},"flowchart":{"curve":"basis","diagramPadding":24}}}%%
+flowchart TD
+    A["User opens web dashboard"] --> B["User selects Manual mode"]
+    B --> C["User presses Pump ON/OFF"]
+    C --> D["Dashboard writes mode and manualPumpOn to Firebase control node"]
+    D --> E["ESP32 reads control commands from Firebase"]
+    E --> F{"manualPumpOn is true?"}
+    F -- Yes --> G["Pump ON<br/>Reason: MANUAL ON or MANUAL PUMPING"]
+    F -- No --> H["Pump OFF<br/>Reason: MANUAL OFF"]
+    G --> I["ESP32 updates state and telemetry in Firebase"]
+    H --> I
+    I --> J["Dashboard displays latest pump status"]
+
+    classDef user fill:#f5f0ff,stroke:#7c3aed,color:#4c1d95,stroke-width:1.5px
+    classDef cloud fill:#fff7ed,stroke:#ea580c,color:#7c2d12,stroke-width:1.5px
+    classDef edge fill:#e9f8ef,stroke:#15803d,color:#14532d,stroke-width:1.5px
+    classDef decision fill:#fff7d6,stroke:#ca8a04,color:#713f12,stroke-width:1.5px
+    classDef pumpOn fill:#dcfce7,stroke:#16a34a,color:#14532d,stroke-width:1.6px
+    classDef pumpOff fill:#fff1f2,stroke:#e11d48,color:#881337,stroke-width:1.6px
+
+    class A,B,C,J user
+    class D,I cloud
+    class E edge
+    class F decision
+    class G pumpOn
+    class H pumpOff

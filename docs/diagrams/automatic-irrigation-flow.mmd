@@ -1,0 +1,49 @@
+%%{init: {"theme":"base","themeCSS":"svg { background-color: #ffffff !important; }","themeVariables":{"darkMode":false,"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#ffffff","mainBkg":"#ffffff","secondBkg":"#ffffff","tertiaryColor":"#ffffff","primaryTextColor":"#111827","textColor":"#111827","lineColor":"#334155","edgeLabelBackground":"#ffffff","clusterBkg":"#f8fafc","clusterBorder":"#cbd5e1"},"flowchart":{"curve":"basis","diagramPadding":24}}}%%
+flowchart TD
+    A([Start auto loop]) --> B["Read latest sensor sample"]
+    B --> C{"Sensor sample available?"}
+    C -- No --> Z["Pump OFF<br/>Reason: NO SENSOR DATA"]
+    C -- Yes --> D{"Water level > 20%?"}
+    D -- No --> E["Pump OFF<br/>Reason: LOW WATER"]
+    D -- Yes --> F{"Soil moisture > 0%?"}
+    F -- No --> G["Pump OFF<br/>Reason: SOIL ZERO"]
+    F -- Yes --> H{"Rain < 30%?"}
+    H -- No --> I["Pump OFF<br/>Reason: RAINING"]
+    H -- Yes --> J{"DS18B20 valid?"}
+    J -- No --> K["Pump OFF<br/>Reason: DS18B20 ERROR"]
+    J -- Yes --> L{"Pump runtime limit reached?"}
+    L -- Yes --> M["Pump OFF<br/>Reason: MAX RUNTIME"]
+    L -- No --> N{"Auto pump enabled?"}
+    N -- No --> O["Pump OFF<br/>Reason: AUTO DISABLED"]
+    N -- Yes --> P{"Pump currently OFF?"}
+    P -- Yes --> Q{"Soil moisture < 30% and cooldown done?"}
+    Q -- Yes --> R["Pump ON<br/>Reason: SOIL DRY"]
+    Q -- No --> S["Pump OFF<br/>Reason: SOIL OK or COOLDOWN"]
+    P -- No --> T{"Soil moisture > 45%?"}
+    T -- Yes --> U["Pump OFF<br/>Reason: SOIL WET"]
+    T -- No --> V["Keep Pump ON<br/>Reason: PUMPING"]
+    E --> W([Repeat loop])
+    G --> W
+    I --> W
+    K --> W
+    M --> W
+    O --> W
+    R --> W
+    S --> W
+    U --> W
+    V --> W
+    Z --> W
+
+    classDef start fill:#f8fafc,stroke:#64748b,color:#334155,stroke-width:1.4px
+    classDef input fill:#eaf3ff,stroke:#2563eb,color:#1e3a8a,stroke-width:1.5px
+    classDef decision fill:#fff7d6,stroke:#ca8a04,color:#713f12,stroke-width:1.5px
+    classDef pumpOn fill:#e9f8ef,stroke:#15803d,color:#14532d,stroke-width:1.6px
+    classDef pumpOff fill:#fff1f2,stroke:#e11d48,color:#881337,stroke-width:1.6px
+    classDef loop fill:#f5f0ff,stroke:#7c3aed,color:#4c1d95,stroke-width:1.4px
+
+    class A start
+    class B input
+    class C,D,F,H,J,L,N,P,Q,T decision
+    class R,V pumpOn
+    class Z,E,G,I,K,M,O,S,U pumpOff
+    class W loop

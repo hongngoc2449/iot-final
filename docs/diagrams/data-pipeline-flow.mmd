@@ -1,0 +1,23 @@
+%%{init: {"theme":"base","themeCSS":"svg { background-color: #ffffff !important; }","themeVariables":{"darkMode":false,"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#ffffff","mainBkg":"#ffffff","secondBkg":"#ffffff","tertiaryColor":"#ffffff","primaryTextColor":"#111827","textColor":"#111827","lineColor":"#334155","edgeLabelBackground":"#ffffff","clusterBkg":"#f8fafc","clusterBorder":"#cbd5e1"},"flowchart":{"curve":"basis","diagramPadding":24}}}%%
+flowchart TD
+    A["Step 1<br/>Sensors collect environmental data"] --> B["Step 2<br/>ESP32 reads and normalizes sensor values"]
+    B --> C["Step 3<br/>ESP32 evaluates automatic or manual control logic"]
+    C --> D["Step 4<br/>ESP32 controls the relay and pump"]
+    C --> E["Step 5<br/>ESP32 uploads latest telemetry and state to Firebase"]
+    E --> F["Step 6<br/>Dashboard polls Firebase for real-time data"]
+    F --> G["Step 7<br/>User monitors values and selects control mode"]
+    G --> H["Step 8<br/>Dashboard writes control commands to Firebase"]
+    H --> I["Step 9<br/>ESP32 reads control commands every 700 ms"]
+    I --> C
+
+    classDef sensor fill:#eaf3ff,stroke:#2563eb,color:#1e3a8a,stroke-width:1.5px
+    classDef edge fill:#e9f8ef,stroke:#15803d,color:#14532d,stroke-width:1.5px
+    classDef cloud fill:#fff7ed,stroke:#ea580c,color:#7c2d12,stroke-width:1.5px
+    classDef app fill:#f5f0ff,stroke:#7c3aed,color:#4c1d95,stroke-width:1.5px
+    classDef actuator fill:#fff1f2,stroke:#e11d48,color:#881337,stroke-width:1.5px
+
+    class A sensor
+    class B,C,I edge
+    class D actuator
+    class E,H cloud
+    class F,G app

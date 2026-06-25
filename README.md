@@ -1,43 +1,104 @@
-# Smart Irrigation ESP32 + Firebase RTDB
+# Smart Irrigation System using ESP32 and Firebase
 
-Firmware doc cam bien dat, muc nuoc, mua, DS18B20 va DHT11; tu dong dieu
-khien bom; hien thi OLED; dong bo du lieu len Firebase Realtime Database.
+**Team:** Chill Out  
+**Course:** Final Project - Internet of Things  
+**Institution:** VNUK Institute for Research and Executive Education - The University of Danang  
+**Academic Year:** 2025-2026
 
-## Cau truc du lieu
+## Team Members
 
-- `smart_irrigation/devices/esp32-irrigation-01/config`: calibration va nguong.
-- `smart_irrigation/devices/esp32-irrigation-01/state`: trang thai thiet bi/bom.
-- `smart_irrigation/devices/esp32-irrigation-01/telemetry/latest`: mau moi nhat.
-- `smart_irrigation/devices/esp32-irrigation-01/telemetry/history`: lich su theo
-  Firebase push ID.
+| Name | Student ID | Role |
+| --- | --- | --- |
+| Le Tiep Tuyen | 22020015 | Team Lead & Developer |
+| Mai Thieu Tin | 22020003 | Developer |
+| Doan Hong Ngoc | 22020010 | Developer |
 
-Firmware ghi `latest` va `state` moi 2 giay, `history` moi 60 giay, va doc `control`
-moi ~700ms de nhan lenh tu dashboard nhanh hon. Dieu khien bom van hoat dong cuc bo
-khi mat Wi-Fi hoac Firebase.
+## Project Overview
 
-Bom bat khi do am dat duoi 30%, co du nuoc, khong mua va cam bien DS18B20 hop
-le. Bom tat khi dat tren 45%, thieu nuoc, co mua, loi cam bien hoac da chay du
-30 giay. Sau khi tat, bom nghi it nhat 5 giay truoc khi co the bat lai.
+This project implements an IoT-based smart irrigation and plant monitoring system using an ESP32 microcontroller, environmental sensors, a relay-controlled water pump, Firebase Realtime Database, and a responsive web dashboard. The system monitors soil moisture, water level, rain intensity, soil temperature, air temperature, and air humidity in near real time. It can automatically control the pump based on sensor conditions or accept manual pump commands from the dashboard.
 
-## Cau hinh Firebase
+## Documentation
 
-1. Tao Firebase Realtime Database.
-2. Dat rules `.read` va `.write` thanh `true` de cho phep ket noi public.
-3. Dien `WIFI_SSID` va `WIFI_PASSWORD` trong `include/secrets.h`.
-4. Firmware da duoc cau hinh voi database URL:
-   `https://smart-irrigation-esp32-af35c-default-rtdb.asia-southeast1.firebasedatabase.app`.
-5. Trong Realtime Database, chon `Import JSON` va upload `data.json`.
-6. Xoa node mau
-   `telemetry/history/sample_remove_after_import` sau khi import.
-7. Publish noi dung `database.rules.json` trong tab `Rules`.
+- [Final Project Report - English](docs/Final_Project_Report.md)
+- [Final Project Report - Vietnamese](docs/Final_Project_Report_VI.md)
+- [Project Proposal / Overview PDF](docs/Final_IoT_Project_Overview.pdf)
 
-Rules public cho phep bat ky ai biet URL doc, sua hoac xoa du lieu. Chi nen dung
-de test; he thong production nen bat Firebase Authentication va rules rieng cho
-tung thiet bi.
+## Key Features
 
-## Build va upload
+- ESP32 firmware built with PlatformIO and the Arduino framework.
+- Sensor monitoring for soil moisture, water level, rain, DS18B20 temperature, and DHT11 temperature/humidity.
+- Automatic irrigation based on soil moisture, water availability, rain detection, DS18B20 validity, pump runtime, and cooldown rules.
+- Manual pump control through Firebase and the web dashboard.
+- OLED display for local device status and sensor readings.
+- Firebase Realtime Database synchronization for telemetry, device state, configuration, and control commands.
+- Responsive static web dashboard deployable with Firebase Hosting.
 
-Du an dung PlatformIO:
+## System Architecture
+
+```mermaid
+%%{init: {"theme":"base","themeCSS":"svg { background-color: #ffffff !important; }","themeVariables":{"darkMode":false,"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#ffffff","mainBkg":"#ffffff","secondBkg":"#ffffff","tertiaryColor":"#ffffff","primaryTextColor":"#111827","textColor":"#111827","lineColor":"#334155","edgeLabelBackground":"#ffffff","clusterBkg":"#f8fafc","clusterBorder":"#cbd5e1"},"flowchart":{"curve":"basis","diagramPadding":24}}}%%
+flowchart TD
+    S[Sensors<br/>Soil moisture<br/>Water level<br/>Rain sensor<br/>DS18B20<br/>DHT11] --> E[ESP32 Microcontroller<br/>Read sensors<br/>Run control logic<br/>Control relay<br/>Update OLED]
+    E --> R[Relay Module]
+    R --> P[DC Water Pump]
+    E <--> F[Firebase Realtime Database<br/>Telemetry<br/>State<br/>Config<br/>Control]
+    F <--> W[Responsive Web Dashboard<br/>Real-time monitoring<br/>Manual control<br/>Trend chart]
+
+    classDef sensor fill:#eaf3ff,stroke:#2563eb,color:#1e3a8a,stroke-width:1.5px
+    classDef edge fill:#e9f8ef,stroke:#15803d,color:#14532d,stroke-width:1.5px
+    classDef actuator fill:#fff1f2,stroke:#e11d48,color:#881337,stroke-width:1.5px
+    classDef cloud fill:#fff7ed,stroke:#ea580c,color:#7c2d12,stroke-width:1.5px
+    classDef app fill:#f5f0ff,stroke:#7c3aed,color:#4c1d95,stroke-width:1.5px
+
+    class S sensor
+    class E,R edge
+    class P actuator
+    class F cloud
+    class W app
+```
+
+Additional diagram sources are stored in [`docs/diagrams`](docs/diagrams).
+
+## Hardware and Pin Mapping
+
+| Component | ESP32 Pin | Purpose |
+| --- | --- | --- |
+| Soil moisture sensor | GPIO34 | Analog soil moisture reading |
+| Water level sensor | GPIO35 | Analog water level reading |
+| Rain sensor | GPIO32 | Analog rain intensity reading |
+| DS18B20 | GPIO19 | Soil/water temperature reading |
+| DHT11 | GPIO4 | Air temperature and humidity |
+| Relay module | GPIO26 | Water pump control |
+| OLED SDA | GPIO21 | I2C data |
+| OLED SCL | GPIO22 | I2C clock |
+
+## Control Logic
+
+In automatic mode, the pump turns on only when the soil moisture is below `30%`, water level is above `20%`, rain is below `30%`, the DS18B20 reading is valid, and the pump cooldown has completed. The pump turns off when the soil reaches above `45%`, water is low, rain is detected, DS18B20 is invalid, soil moisture is zero, or the pump reaches the configured `30` second runtime limit.
+
+In manual mode, the current firmware follows the dashboard pump request directly. This mode bypasses the automatic irrigation checks, so it should be used carefully during demonstrations and testing.
+
+## Firebase Data Structure
+
+The project uses this main database path:
+
+```text
+smart_irrigation/devices/esp32-irrigation-01
+```
+
+Main nodes:
+
+- `config`: effective calibration values, thresholds, upload intervals, and test mode settings.
+- `control`: dashboard commands such as `mode` and `manualPumpOn`.
+- `state`: online status, pump state, Wi-Fi RSSI, control mode, and last seen time.
+- `telemetry/latest`: latest sensor and pump sample.
+- `telemetry/history`: historical samples stored with Firebase push IDs.
+
+The firmware updates `telemetry/latest` and `state` every `2` seconds, uploads `telemetry/history` every `60` seconds, and reads dashboard control commands about every `700` milliseconds.
+
+## Build and Upload
+
+Create `include/secrets.h` from `include/secrets.example.h`, then set the Wi-Fi credentials and Firebase database URL.
 
 ```powershell
 pio run
@@ -45,36 +106,49 @@ pio run --target upload
 pio device monitor
 ```
 
-Neu relay cua ban la active LOW, doi
-`AppConfig::RELAY_ACTIVE_LOW` thanh `true` trong `include/app_config.h`.
+If the relay module is active LOW, set `AppConfig::RELAY_ACTIVE_LOW` to `true` in `include/app_config.h`.
 
-Can hieu chinh cac gia tri raw trong `include/app_config.h` theo cam bien thuc
-te truoc khi cho bom chay.
+## Web Dashboard
 
-## Dashboard web
-
-Dashboard tinh nam trong thu muc `web/`. Co the chay truc tiep bang mot static
-server hoac deploy len Firebase Hosting:
+The dashboard is located in [`web`](web). It can be served as a static website or deployed to Firebase Hosting.
 
 ```powershell
 npx firebase-tools deploy --only hosting
 ```
 
-Dashboard doc du lieu moi 1 giay, co retry xac nhan lenh, va ghi len node `control`:
+The dashboard polls Firebase, displays live sensor values, shows a recent trend chart, switches between auto/manual mode, and writes pump commands to the `control` node.
 
-- `mode: "auto"`: ESP32 dieu khien bom theo cam bien.
-- `mode: "manual"` va `manualPumpOn: true`: yeu cau bat bom thu cong.
-- Lenh manual van bi chan neu thieu nuoc, dang mua hoac DS18B20 loi.
-- Sau khi manual chay du 30 giay, can tat yeu cau roi bat lai.
+## Screenshots
 
-## Che do test day noi pump tam thoi
+**Web dashboard overview**
 
-Trang thai che do test trong `include/app_config.h`:
+![Web dashboard overview](docs/screenshots/web-dashboard-overview.png)
 
-- `FORCE_SOIL_PERCENT_FOR_TEST = false`: dung soil percent thuc te.
-- `ENABLE_PUMP_RUNTIME_LIMIT = true`: pump tu tat sau 30 giay.
-- Pump luon tat khi soil percent bang 0%.
-- Bao ve thieu nuoc, mua va loi DS18B20 van hoat dong.
+**Dashboard control panel and trend chart**
 
-Sau khi test xong, dat `FORCE_SOIL_PERCENT_FOR_TEST = false` va
-`ENABLE_PUMP_RUNTIME_LIMIT = true` de khoi phuc van hanh an toan.
+![Web dashboard controls and trend chart](docs/screenshots/web-dashboard-controls-trend.png)
+
+**Firebase Realtime Database structure**
+
+![Firebase Realtime Database structure](docs/screenshots/firebase-realtime-database-structure.png)
+
+## Firebase Setup
+
+1. Create a Firebase Realtime Database.
+2. Import [`data.json`](data.json) as the initial schema.
+3. Remove `telemetry/history/sample_remove_after_import` after import.
+4. Publish [`database.rules.json`](database.rules.json) in the Firebase Rules tab.
+
+The included rules allow public read/write access for demonstration only. A production deployment should use Firebase Authentication and stricter database rules.
+
+## Repository Structure
+
+```text
+include/                 Firmware configuration and shared state types
+src/                     ESP32 firmware and Firebase synchronization
+web/                     Static responsive dashboard
+docs/                    Project overview PDF and diagram sources
+data.json                Initial Firebase Realtime Database schema
+firebase.json            Firebase Hosting and database configuration
+platformio.ini           PlatformIO project configuration
+```
