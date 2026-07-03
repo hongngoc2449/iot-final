@@ -1,0 +1,29 @@
+%%{init: {"theme":"base","themeCSS":"svg { background-color: #ffffff !important; }","themeVariables":{"darkMode":false,"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#ffffff","mainBkg":"#ffffff","primaryTextColor":"#111827","textColor":"#111827","lineColor":"#475569","edgeLabelBackground":"#ffffff","clusterBkg":"#f8fafc","clusterBorder":"#cbd5e1"},"flowchart":{"curve":"basis","diagramPadding":24}}}%%
+flowchart LR
+    Sensors["Sensors<br/>Soil, water, rain<br/>DS18B20, DHT11"] -->|"raw readings"| ESP32["ESP32 Firmware<br/>sensor processing<br/>pump logic"]
+    ESP32 -->|"set every 2s"| Latest["telemetry/latest"]
+    ESP32 -->|"set every 2s"| State["state"]
+    ESP32 -->|"push every 60s"| History["telemetry/history"]
+    ESP32 -->|"set at startup"| Config["config"]
+    ESP32 -->|"set at startup"| Metadata["metadata/runtime"]
+
+    Latest -->|"REST poll"| Dashboard["Web Dashboard"]
+    State -->|"REST poll"| Dashboard
+    Config -->|"threshold display"| Dashboard
+    History -->|"trend data"| Dashboard
+
+    Dashboard -->|"PATCH command"| Control["control"]
+    Control -->|"read every 700ms"| ESP32
+    ESP32 -->|"GPIO26"| Pump["Relay / DC Pump"]
+
+    classDef edge fill:#e9f8ef,stroke:#15803d,color:#14532d,stroke-width:1.5px
+    classDef cloud fill:#fff7ed,stroke:#ea580c,color:#7c2d12,stroke-width:1.5px
+    classDef app fill:#f5f0ff,stroke:#7c3aed,color:#4c1d95,stroke-width:1.5px
+    classDef device fill:#eaf3ff,stroke:#2563eb,color:#1e3a8a,stroke-width:1.5px
+    classDef actuator fill:#fff1f2,stroke:#e11d48,color:#881337,stroke-width:1.5px
+
+    class ESP32 edge
+    class Latest,State,History,Config,Metadata,Control cloud
+    class Dashboard app
+    class Sensors device
+    class Pump actuator
