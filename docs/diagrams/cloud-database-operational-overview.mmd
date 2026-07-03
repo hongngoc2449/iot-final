@@ -1,0 +1,23 @@
+%%{init: {"theme":"base","themeCSS":"svg { background-color: #ffffff !important; }","themeVariables":{"darkMode":false,"fontFamily":"Inter, Segoe UI, Arial, sans-serif","background":"#ffffff","mainBkg":"#ffffff","primaryTextColor":"#111827","textColor":"#111827","lineColor":"#475569","edgeLabelBackground":"#ffffff","clusterBkg":"#f8fafc","clusterBorder":"#cbd5e1"},"flowchart":{"curve":"basis","diagramPadding":24}}}%%
+flowchart LR
+    ESP32["ESP32 Device<br/>sensor reading<br/>pump logic"]
+    Firebase["Firebase Realtime Database<br/>telemetry / state / control"]
+    Dashboard["Web Dashboard<br/>monitoring<br/>manual control"]
+    Pump["Relay / DC Pump"]
+
+    ESP32 -->|"upload telemetry + state"| Firebase
+    Firebase -->|"read latest data"| Dashboard
+    Dashboard -->|"write control command"| Firebase
+    Firebase -->|"read control command"| ESP32
+    ESP32 -->|"actuate GPIO26"| Pump
+    ESP32 -->|"report pump status"| Firebase
+
+    classDef edge fill:#e9f8ef,stroke:#15803d,color:#14532d,stroke-width:1.5px
+    classDef cloud fill:#fff7ed,stroke:#ea580c,color:#7c2d12,stroke-width:1.5px
+    classDef app fill:#f5f0ff,stroke:#7c3aed,color:#4c1d95,stroke-width:1.5px
+    classDef actuator fill:#fff1f2,stroke:#e11d48,color:#881337,stroke-width:1.5px
+
+    class ESP32 edge
+    class Firebase cloud
+    class Dashboard app
+    class Pump actuator

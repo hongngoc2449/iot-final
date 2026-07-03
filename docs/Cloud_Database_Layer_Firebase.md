@@ -10,11 +10,19 @@ Firebase Realtime Database is the cloud bridge between the physical IoT device a
 
 The ESP32 is the main writer for telemetry and state data. The web dashboard is the main writer for control commands.
 
+## 2. Operational Overview Flow
+
+The following overview shows the two-way operating flow among the ESP32, Firebase Realtime Database, and the Web Dashboard.
+
+![Cloud database operational overview](diagrams/rendered/cloud-database-operational-overview.png)
+
+_Source: `docs/diagrams/cloud-database-operational-overview.mmd`._
+
 ![Cloud database layer flow](diagrams/rendered/cloud-database-layer-flow.png)
 
 _Source: `docs/diagrams/cloud-database-layer-flow.mmd`._
 
-## 2. Database Schema
+## 3. Database Schema
 
 ```text
 smart_irrigation
@@ -36,7 +44,7 @@ smart_irrigation
 | `devices` | Container for all IoT devices. |
 | `esp32-irrigation-01` | The current ESP32 device node. |
 
-## 3. `config`
+## 4. `config`
 
 `config` stores the effective firmware configuration uploaded by the ESP32. It helps the dashboard and reviewers understand the calibration values, thresholds, upload intervals, and test settings currently used by the device.
 
@@ -56,7 +64,7 @@ smart_irrigation
 | `uploadIntervals.historyMs` | Push interval for `telemetry/history`. Current value: `60000 ms`. |
 | `testMode` | Firmware test-mode information, such as forced soil percentage and runtime-limit status. |
 
-## 4. `control`
+## 5. `control`
 
 `control` is the command node written by the web dashboard and read by the ESP32.
 
@@ -78,7 +86,7 @@ smart_irrigation
 
 The ESP32 reads `control/mode` and `control/manualPumpOn` about every `700 ms`. In the current firmware, manual mode directly follows the dashboard command and bypasses automatic safety checks, so it should be used carefully during demonstrations.
 
-## 5. `metadata`
+## 6. `metadata`
 
 `metadata` identifies the device and records runtime information.
 
@@ -93,7 +101,7 @@ The ESP32 reads `control/mode` and `control/manualPumpOn` about every `700 ms`. 
 | `runtime.bootedAt` | Firebase server timestamp when the runtime metadata was uploaded. |
 | `runtime.bootedAtText` | Human-readable boot time, or `TIME_NOT_SYNCED` if NTP is not ready. |
 
-## 6. `state`
+## 7. `state`
 
 `state` represents the latest operational status of the ESP32.
 
@@ -112,7 +120,7 @@ The ESP32 reads `control/mode` and `control/manualPumpOn` about every `700 ms`. 
 
 The dashboard uses `state.lastSeen` and `state.online` to show whether the ESP32 is online or offline.
 
-## 7. `telemetry/latest`
+## 8. `telemetry/latest`
 
 `telemetry/latest` stores the most recent sensor and pump sample. This node is overwritten every upload cycle and is used for real-time dashboard cards.
 
@@ -136,7 +144,7 @@ The dashboard uses `state.lastSeen` and `state.online` to show whether the ESP32
 | `timestampText` | Human-readable timestamp from ESP32. |
 | `uptimeMs` | ESP32 uptime when the sample was collected. |
 
-## 8. `telemetry/history`
+## 9. `telemetry/history`
 
 `telemetry/history` stores historical samples using Firebase push IDs.
 
@@ -144,7 +152,7 @@ Each history record has a structure similar to `telemetry/latest`, but it is app
 
 In the current exported sample, the history node contains `177` telemetry records.
 
-## 9. Device-to-Database Mapping
+## 10. Device-to-Database Mapping
 
 | Hardware / Firmware Source | Firebase Field |
 | --- | --- |
@@ -157,7 +165,7 @@ In the current exported sample, the history node contains `177` telemetry record
 | Dashboard mode switch | `control.mode` |
 | Dashboard pump button | `control.manualPumpOn` |
 
-## 10. Key Presentation Points
+## 11. Key Presentation Points
 
 - Firebase Realtime Database connects the ESP32 device and the web dashboard in near real time.
 - `telemetry/latest` is for live monitoring; `telemetry/history` is for historical records.
